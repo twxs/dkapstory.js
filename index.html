@@ -1,0 +1,301 @@
+﻿<!doctype html>
+<html>
+<head>
+    <title>D-Kapstory</title>
+    <meta charset="utf-8">
+
+    <script src="vendor/three.js/three.min.js"></script>
+    <link href="css/main.css" rel="stylesheet" />
+</head>
+<body>
+
+    <div id="container"></div>
+
+
+    <script type="text/javascript">
+        function v3(x, y, z) { return new THREE.Vector3(x, y, z); }
+        function v3cpy(v) { return new THREE.Vector3(v.x, v.y, v.z); }
+        // generate random number in specified the range
+        function df_rnd(from, to) {
+            var rnd = Math.random();
+            return from + rnd * (to - from);
+        }
+        function df_particule(vit, pos) {
+            this.m = 0.32;
+            this.p0 = v3cpy(pos);
+            this.v0 = v3cpy(vit);
+           
+            this.reset = function () {
+                this.p = v3cpy(this.p0);
+                this.v = v3cpy(this.v0);
+                this.t0 = 0;
+            }
+            this.reset();
+         
+           
+            this.animate = function (dt) {
+                this.t0 += dt/2;
+                var t = this.t0;
+                var t2 = t * t;
+                var new_pos = v3(0, 0, 0);
+
+                new_pos.x = this.v.x * t + this.p.x;
+
+                new_pos.y = 0.5*(-9.81 * this.m) * t2 + this.v.y * t + this.p.y;
+
+                new_pos.z = this.v.z * t + this.p.z;
+                
+                if (new_pos.y < 0) {
+                    this.t0 = 0;
+                    this.v.y /= 2;
+                    this.v.z *= 2;
+                    this.v.x *= 2;
+                    this.p.x = new_pos.x;
+                    this.p.y = 0;
+                    this.p.z = new_pos.z;
+                    if (this.v.y < 0.05) {
+                        this.v = v3cpy(this.v0);
+                        this.p = v3cpy(this.p0);
+                    }
+                } else 
+                {
+                    this.p = v3cpy(new_pos);
+                }
+            }   
+        }
+        function df_caps_animator(capsCount, pos) {
+            this.obj = new THREE.Object3D();
+
+            this.caps = new Array();
+            this.particules = new Array();
+
+            for (var i = 0; i < capsCount; ++i) {
+                this.caps.push(new df_caps());
+                this.obj.add(this.caps[i].mesh);
+
+                var particule = new df_particule(new THREE.Vector3(df_rnd(-1, 1), 4 + df_rnd(-1, 1), df_rnd(-0.5, 0.5)),
+                    new THREE.Vector3(pos.x + df_rnd(-1, 1), pos.y + df_rnd(0, 1), pos.z));
+
+                this.particules.push(particule);
+            }
+
+
+
+            this.t = 0;
+            this.p = 9.81;
+            this.m = 100;
+            this.animate = function (dt) {
+                this.t += dt;
+                // x''= p/mani
+                // x' = p/m t + v0
+                // x  = (p/2m) t^2 + v0 t + p0
+          
+                for (var i = 0; i < this.caps.length; ++i) {
+                    this.particules[i].animate(dt);
+                    var new_pos = v3cpy(this.particules[i].p);
+                    this.caps[i].move_to(new_pos.x, new_pos.y, new_pos.z);
+                    this.caps[i].mesh.rotation.x = new_pos.z / 10;
+                    this.caps[i].mesh.rotation.z = new_pos.y / 10;
+                }
+            }
+        }
+
+        function df_caps() {
+            this.mesh = makeCaps();
+            this.mesh.castShadow = true;
+
+            this.move_to = function (x, y, z) {
+                this.mesh.position.x = x;
+                this.mesh.position.y = y;
+                this.mesh.position.z = z;
+            }
+        }
+
+
+
+        var renderer, scene, camera, bottle, caps, mycaps, animator;
+
+        init();
+        document.addEventListener('mousemove', onDocumentMouseMove, false);
+        animate();
+
+
+        function makeBottle() {
+            var baseradius = 10;
+            var topradius = 5;
+            var baseheight = 30;
+            var topheight = 10;
+            var ringheight = 2;
+            var ringradius = 5.5;
+
+            var base, top, ring;
+
+
+            var material = new THREE.MeshLambertMaterial({ color: 0xCCFCC0 });
+
+
+            var bottle = new THREE.Object3D();
+
+
+            base = new THREE.Mesh(new THREE.CylinderGeometry(baseradius, baseradius, baseheight, 10, 10), material);
+            base.position.y = baseheight / 2;
+
+            top = new THREE.Mesh(new THREE.CylinderGeometry(topradius, baseradius, topheight, 10, 10), material);
+            top.position.y = baseheight + topheight / 2;
+
+            ring = new THREE.Mesh(new THREE.CylinderGeometry(ringradius, ringradius, ringheight, 10, 10), material);
+            ring.position.y = baseheight + topheight + ringheight / 2;
+
+
+            base.castShadow = true;
+            top.castShadow = true;
+            ring.castShadow = true;
+
+            base.receiveShadow = true;
+            top.receiveShadow = true;
+            ring.receiveShadow = true;
+
+            bottle.add(top)
+            bottle.add(base)
+            bottle.add(ring)
+            return bottle;
+        }
+
+        function makeCaps() {
+            var material = new THREE.MeshLambertMaterial({ color: 0xFC0C20 });
+
+
+            var geometry = new THREE.CylinderGeometry(6, 6.2, 2);
+            var ring = new THREE.Mesh(geometry, material);
+            return ring;
+        }
+
+        function onDocumentMouseMove(event) {
+
+            event.preventDefault();
+
+            var movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
+            var movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
+
+            //camera.rotation.x += movementY*0.001;
+            //camera.rotation.y += movementX*0.001;
+            mycaps.position.x += movementX * 0.1;
+            mycaps.position.y += movementY * 0.1;
+
+            render();
+
+        }
+
+
+        function init() {
+            // on initialise le moteur de rendu
+            renderer = new THREE.WebGLRenderer();
+
+            // si WebGL ne fonctionne pas sur votre navigateur vous pouvez utiliser le moteur de rendu Canvas à la place
+            // renderer = new THREE.CanvasRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('container').appendChild(renderer.domElement);
+
+            // on initialise la scène
+            scene = new THREE.Scene();
+
+            // on initialise la camera que l’on place ensuite sur la scène
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+            camera.position.set(0, 150, 250);
+            // camera.rotation.x = -0.25;
+            camera.lookAt(new THREE.Vector3(0.0, 50.0, 0.0));
+            scene.add(camera);
+
+            bottle = makeBottle();
+            caps = makeCaps();
+            mycaps = makeCaps();
+            caps.position.y = 42;
+            mycaps.position.y = 50;
+            mycaps.position.z = 20;
+            mycaps.position.x = 7;
+             scene.add(bottle);
+             scene.add(caps);
+            // scene.add(mycaps);
+
+            var capsule = new df_caps();
+            capsule.mesh.position.x = 20;
+            capsule.mesh.position.y = 20;
+            capsule.mesh.position.z = 20;
+            //scene.add(capsule.mesh);
+
+
+            animator = new df_caps_animator(160, new THREE.Vector3(0, 48, 0));
+            scene.add(animator.obj);
+
+
+            /* Floor  */
+            var geometry = new THREE.PlaneGeometry(500, 500, 5, 5);
+            var material = new THREE.MeshPhongMaterial({ color: 0x22FF11 });
+            var floor = new THREE.Mesh(geometry, material);
+            floor.material.side = THREE.DoubleSide;
+            floor.rotation.x = 3.1415 / 2;
+            scene.add(floor);
+
+
+            var light = new THREE.DirectionalLight(0xffffff);
+            light.position.set(50, 125, 50);
+            light.target.position.set(0, 2, 50);
+            light.castShadow = true;
+            light.shadowDarkness = 0.5;
+            light.shadowCameraVisible = true; // only for debugging
+            // these six values define the boundaries of the yellow box seen above
+            light.shadowCameraNear = 20;
+            light.shadowCameraFar = 150;
+            light.shadowCameraLeft = -100;
+            light.shadowCameraRight = 100;
+            light.shadowCameraTop = 100;
+            light.shadowCameraBottom = -75;
+            scene.add(light);
+
+            bottle.receiveShadow = true;
+            caps.castShadow = true;
+            caps.receiveShadow = true;
+            mycaps.receiveShadow = true;
+            mycaps.castShadow = true;
+
+            floor.receiveShadow = true;
+            // add to the scene
+
+
+
+            renderer.shadowMapEnabled = true;
+            renderer.shadowMapSoft = true;
+
+            renderer.shadowCameraNear = 25;
+            renderer.shadowCameraFar = camera.far;
+            renderer.shadowCameraFov = 50;
+
+            renderer.shadowMapBias = 0.0039;
+            renderer.shadowMapDarkness = 0.5;
+            renderer.shadowMapWidth = 1024;
+            renderer.shadowMapHeight = 1024;
+
+            // on effectue le rendu de la scène
+            //renderer.render( scene, camera );
+        }
+
+        function animate() {
+
+            // note: three.js includes requestAnimationFrame shim
+            requestAnimationFrame(animate);
+            animator.animate(0.1510);
+            render();
+
+        }
+
+        function render() {
+
+            // mesh.rotation.x += 0.01;
+            //mesh.rotation.y += 0.02;
+
+            renderer.render(scene, camera);
+
+        }
+    </script>
+</body>
+</html>
