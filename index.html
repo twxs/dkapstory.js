@@ -4,99 +4,90 @@
     <title>D-Kapstory</title>
     <meta charset="utf-8">
 
-    <script src="vendor/three.js/three.min.js"></script>
+    <script src="./vendor/three.js/three.min.js"></script>
+    
+    <script src="./js/dk.js"></script>
     <link href="css/main.css" rel="stylesheet" />
 </head>
 <body>
 
-    <div id="container"></div>
+    <div id="container" width="512" height="512"></div>
 
 
     <script type="text/javascript">
-        function v3(x, y, z) { return new THREE.Vector3(x, y, z); }
-        function v3cpy(v) { return new THREE.Vector3(v.x, v.y, v.z); }
-        // generate random number in specified the range
-        function df_rnd(from, to) {
-            var rnd = Math.random();
-            return from + rnd * (to - from);
-        }
+        
+        var factory = new DFK.Factory();
+        
+        
+        
         function df_particule(vit, pos) {
-            this.m = 0.32;
-            this.p0 = v3cpy(pos);
-            this.v0 = v3cpy(vit);
+            var d = {};
+            d.m = 0.32;
+            d.p0 = pos.clone();
+            d.v0 = vit.clone();
 
-            this.reset = function () {
-                this.p = v3cpy(this.p0);
-                this.v = v3cpy(this.v0);
-                this.t0 = 0;
+            var part = new DFK.particule(d.m, DFK.P);
+            
+            part.onDie = function (p, v)
+            {
+                if (v.y < 0.1) // Full reset
+                    part.reset(d.p0, d.v0);
+                else // bounce
+                    part.reset(p, DFK.v3(2*v.x, 0.5*v.y, 2*v.z));
             }
-            this.reset();
-
-
-            this.animate = function (dt) {
-                this.t0 += dt / 2;
-                var t = this.t0;
-                var t2 = t * t;
-                var new_pos = v3(0, 0, 0);
-
-                new_pos.x = this.v.x * t + this.p.x;
-
-                new_pos.y = 0.5 * (-9.81 * this.m) * t2 + this.v.y * t + this.p.y;
-
-                new_pos.z = this.v.z * t + this.p.z;
-
-                if (new_pos.y < 0) {
-                    this.t0 = 0;
-                    this.v.y /= 2;
-                    this.v.z *= 2;
-                    this.v.x *= 2;
-                    this.p.x = new_pos.x;
-                    this.p.y = 0;
-                    this.p.z = new_pos.z;
-                    if (this.v.y < 0.05) {
-                        this.v = v3cpy(this.v0);
-                        this.p = v3cpy(this.p0);
-                    }
-                } else {
-                    this.p = v3cpy(new_pos);
-                }
+            part.shouldDie = function(p, v) {
+                return p.y < 0;
             }
+            
+            d.animate = function (dt) {
+                d.p = part.next(dt);
+            }
+            return d;
         }
+        
+        
         function df_caps_animator(capsCount, pos) {
-            this.obj = new THREE.Object3D();
+            var d =  {};
+            d.obj = new THREE.Object3D();
 
-            this.caps = new Array();
-            this.particules = new Array();
+            d.caps = [];
+            d.particules = [];
 
             for (var i = 0; i < capsCount; ++i) {
-                this.caps.push(new df_caps());
-                this.obj.add(this.caps[i].mesh);
+                d.caps.push(new df_caps());
+                d.obj.add(d.caps[i].mesh);
 
-                var particule = new df_particule(new THREE.Vector3(Math.sin(df_rnd(-3.1415, 3.1415)), 4 + df_rnd(-1, 1.5), Math.cos(df_rnd(-3.1415, 3.1415))),
-                    new THREE.Vector3(pos.x + df_rnd(-1, 1), pos.y + df_rnd(0, 1), pos.z));
+                var part = new DFK.particule(0.32, DFK.P);
+                
+                part.onDie = function (part)
+                {
+                    var min = 5;
+                    if (part.v.y < min) // Full reset
+                        part.reset(new THREE.Vector3(pos.x + DFK.rnd(-1, 1), pos.y + DFK.rnd(0, 1), pos.z),
+                                   new THREE.Vector3(Math.sin(DFK.rnd(-3.1415, 3.1415)), 4 + DFK.rnd(-1, 1.5), Math.cos(DFK.rnd(-3.1415, 3.1415))));
+                    else // bounce
+                    {
+                        part.p.y = min;
+                        part.reset(part.p, DFK.v3(2*part.v.x, 0.7*part.v.y, 2*part.v.z));
+                    }
+                }
+                part.shouldDie = function(p, v) {
+                    return p.y < 0;
+                }
 
-                this.particules.push(particule);
+               
+                d.particules.push(part);
             }
 
-
-
-            this.t = 0;
-            this.p = 9.81;
-            this.m = 100;
-            this.animate = function (dt) {
-                this.t += dt;
-                // x''= p/mani
-                // x' = p/m t + v0
-                // x  = (p/2m) t^2 + v0 t + p0
-
-                for (var i = 0; i < this.caps.length; ++i) {
-                    this.particules[i].animate(dt);
-                    var new_pos = v3cpy(this.particules[i].p);
-                    this.caps[i].move_to(new_pos.x, new_pos.y, new_pos.z);
-                    this.caps[i].mesh.rotation.x = new_pos.z / 10;
-                    this.caps[i].mesh.rotation.z = new_pos.y / 10;
+            d.animate = function (dt) {
+                for (var i = 0; i < d.caps.length; ++i) {
+                    var new_pos = d.particules[i].next(dt);
+                    d.caps[i].move_to(new_pos.x, new_pos.y, new_pos.z);
+                    d.caps[i].mesh.rotation.x = new_pos.z / 10;
+                    d.caps[i].mesh.rotation.z = new_pos.y / 10;
                 }
             }
+            return d;
         }
 
         function df_caps() {
@@ -162,10 +153,14 @@
 
         function makeCaps() {
             var material = new THREE.MeshLambertMaterial({ color: 0xFC0C20 });
+            var geometry;
 
-
-            var geometry = new THREE.CylinderGeometry(6, 6.2, 2);
-            var ring = new THREE.Mesh(geometry, material);
+            if(!factory.contains("geom::caps"))
+            {
+                geometry = new THREE.CylinderGeometry(6, 6.2, 2);
+                factory.add("geom::caps", geometry);
+            }
+            var ring = new THREE.Mesh(factory.create("geom::caps"), material);
             return ring;
         }
 
@@ -189,7 +184,7 @@
 
            
 
-            var lightDir = v3(lightTarget.x - lightPos.x, lightTarget.y - lightPos.y, lightTarget.z - lightPos.z);
+            var lightDir = DFK.v3(lightTarget.x - lightPos.x, lightTarget.y - lightPos.y, lightTarget.z - lightPos.z);
             var dist = Math.sqrt(lightDir.x * lightDir.x + lightDir.y * lightDir.y + lightDir.z * lightDir.z);
             document.title = lightDir.x;
             var light = new THREE.DirectionalLight(0x444444);
@@ -249,7 +244,7 @@
             //scene.add(capsule.mesh);
 
 
-            animator = new df_caps_animator(100, new THREE.Vector3(0, 48, 0));
+            animator = new df_caps_animator(200, new THREE.Vector3(0, 48, 0));
             scene.add(animator.obj);
 
             var floorRadius = 200;
@@ -261,15 +256,15 @@
             //floor.rotation.x = 3.1415 / 2;
             scene.add(floor);
 
-            var lightPos = v3(floorRadius + 50, 2*floorRadius, 0.5*floorRadius + 50);
+            var lightPos = DFK.v3(floorRadius + 50, 2*floorRadius, 0.5*floorRadius + 50);
           
-            scene.add(df_dlight(lightPos, v3(0, 30, 0), floorRadius));
+            scene.add(df_dlight(lightPos, DFK.v3(0, 30, 0), floorRadius));
             lightPos.x *= -1;
-            scene.add(df_dlight(lightPos, v3(0, 30, 0), floorRadius));
+            scene.add(df_dlight(lightPos, DFK.v3(0, 30, 0), floorRadius));
             lightPos.z *= -1;
-            scene.add(df_dlight(lightPos, v3(0, 30, 0), floorRadius));
+            scene.add(df_dlight(lightPos, DFK.v3(0, 30, 0), floorRadius));
             lightPos.x *= -1;
-            scene.add(df_dlight(lightPos, v3(0, 30, 0), floorRadius));
+            scene.add(df_dlight(lightPos, DFK.v3(0, 30, 0), floorRadius));
 
             bottle.receiveShadow = true;
             caps.castShadow = true;
@@ -304,8 +299,8 @@
             // note: three.js includes requestAnimationFrame shim
             requestAnimationFrame(animate);
 
-            animator.animate(0.1510);
-            gt += 0.0510;
+            animator.animate(0.10510);
+            gt += 0.02510;
 
             camera.position.set((150 + 50*Math.cos(gt/3))*Math.sin(gt), 150 + 100*(1+Math.sin(gt)), (250 + 50*Math.sin(gt/3))*Math.cos(gt));
             camera.lookAt(new THREE.Vector3(0.0, 50.0, 0.0));
