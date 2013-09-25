@@ -24,27 +24,27 @@
             this.m = 0.32;
             this.p0 = v3cpy(pos);
             this.v0 = v3cpy(vit);
-           
+
             this.reset = function () {
                 this.p = v3cpy(this.p0);
                 this.v = v3cpy(this.v0);
                 this.t0 = 0;
             }
             this.reset();
-         
-           
+
+
             this.animate = function (dt) {
-                this.t0 += dt/2;
+                this.t0 += dt / 2;
                 var t = this.t0;
                 var t2 = t * t;
                 var new_pos = v3(0, 0, 0);
 
                 new_pos.x = this.v.x * t + this.p.x;
 
-                new_pos.y = 0.5*(-9.81 * this.m) * t2 + this.v.y * t + this.p.y;
+                new_pos.y = 0.5 * (-9.81 * this.m) * t2 + this.v.y * t + this.p.y;
 
                 new_pos.z = this.v.z * t + this.p.z;
-                
+
                 if (new_pos.y < 0) {
                     this.t0 = 0;
                     this.v.y /= 2;
@@ -57,11 +57,10 @@
                         this.v = v3cpy(this.v0);
                         this.p = v3cpy(this.p0);
                     }
-                } else 
-                {
+                } else {
                     this.p = v3cpy(new_pos);
                 }
-            }   
+            }
         }
         function df_caps_animator(capsCount, pos) {
             this.obj = new THREE.Object3D();
@@ -73,7 +72,7 @@
                 this.caps.push(new df_caps());
                 this.obj.add(this.caps[i].mesh);
 
-                var particule = new df_particule(new THREE.Vector3(df_rnd(-1, 1), 4 + df_rnd(-1, 1), df_rnd(-0.5, 0.5)),
+                var particule = new df_particule(new THREE.Vector3(Math.sin(df_rnd(-3.1415, 3.1415)), 4 + df_rnd(-1, 1.5), Math.cos(df_rnd(-3.1415, 3.1415))),
                     new THREE.Vector3(pos.x + df_rnd(-1, 1), pos.y + df_rnd(0, 1), pos.z));
 
                 this.particules.push(particule);
@@ -89,7 +88,7 @@
                 // x''= p/mani
                 // x' = p/m t + v0
                 // x  = (p/2m) t^2 + v0 t + p0
-          
+
                 for (var i = 0; i < this.caps.length; ++i) {
                     this.particules[i].animate(dt);
                     var new_pos = v3cpy(this.particules[i].p);
@@ -186,6 +185,32 @@
 
         }
 
+        function df_dlight(lightPos, lightTarget, floorRadius) {
+
+           
+
+            var lightDir = v3(lightTarget.x - lightPos.x, lightTarget.y - lightPos.y, lightTarget.z - lightPos.z);
+            var dist = Math.sqrt(lightDir.x * lightDir.x + lightDir.y * lightDir.y + lightDir.z * lightDir.z);
+            document.title = lightDir.x;
+            var light = new THREE.DirectionalLight(0x444444);
+
+            light.position.set(lightPos.x, lightPos.y, lightPos.z);
+            light.target.position.set(lightTarget.x, lightTarget.y, lightTarget.z);
+
+            light.castShadow = true;
+            light.shadowDarkness = 0.5;
+            //light.shadowCameraVisible = true; // only for debugging
+            // these six values define the boundaries of the yellow box seen above
+            light.shadowCameraNear = dist - floorRadius;
+            light.shadowCameraFar = dist + floorRadius;
+            light.shadowCameraLeft = -floorRadius;
+            light.shadowCameraRight = floorRadius;
+            light.shadowCameraTop = floorRadius;
+            light.shadowCameraBottom = -floorRadius;
+            return light;
+
+        }
+
 
         function init() {
             // on initialise le moteur de rendu
@@ -213,9 +238,9 @@
             mycaps.position.y = 50;
             mycaps.position.z = 20;
             mycaps.position.x = 7;
-             scene.add(bottle);
-             scene.add(caps);
-            // scene.add(mycaps);
+            scene.add(bottle);
+            scene.add(caps);
+            scene.add(mycaps);
 
             var capsule = new df_caps();
             capsule.mesh.position.x = 20;
@@ -224,33 +249,27 @@
             //scene.add(capsule.mesh);
 
 
-            animator = new df_caps_animator(160, new THREE.Vector3(0, 48, 0));
+            animator = new df_caps_animator(100, new THREE.Vector3(0, 48, 0));
             scene.add(animator.obj);
 
-
+            var floorRadius = 200;
             /* Floor  */
-            var geometry = new THREE.PlaneGeometry(500, 500, 5, 5);
-            var material = new THREE.MeshPhongMaterial({ color: 0x22FF11 });
+            var geometry = new THREE.CylinderGeometry(floorRadius, floorRadius, 0.1, 20, 8);
+            var material = new THREE.MeshPhongMaterial({ color: 0x42AF33 });
             var floor = new THREE.Mesh(geometry, material);
             floor.material.side = THREE.DoubleSide;
-            floor.rotation.x = 3.1415 / 2;
+            //floor.rotation.x = 3.1415 / 2;
             scene.add(floor);
 
-
-            var light = new THREE.DirectionalLight(0xffffff);
-            light.position.set(50, 125, 50);
-            light.target.position.set(0, 2, 50);
-            light.castShadow = true;
-            light.shadowDarkness = 0.5;
-            light.shadowCameraVisible = true; // only for debugging
-            // these six values define the boundaries of the yellow box seen above
-            light.shadowCameraNear = 20;
-            light.shadowCameraFar = 150;
-            light.shadowCameraLeft = -100;
-            light.shadowCameraRight = 100;
-            light.shadowCameraTop = 100;
-            light.shadowCameraBottom = -75;
-            scene.add(light);
+            var lightPos = v3(floorRadius + 50, 2*floorRadius, 0.5*floorRadius + 50);
+          
+            scene.add(df_dlight(lightPos, v3(0, 30, 0), floorRadius));
+            lightPos.x *= -1;
+            scene.add(df_dlight(lightPos, v3(0, 30, 0), floorRadius));
+            lightPos.z *= -1;
+            scene.add(df_dlight(lightPos, v3(0, 30, 0), floorRadius));
+            lightPos.x *= -1;
+            scene.add(df_dlight(lightPos, v3(0, 30, 0), floorRadius));
 
             bottle.receiveShadow = true;
             caps.castShadow = true;
@@ -266,7 +285,7 @@
             renderer.shadowMapEnabled = true;
             renderer.shadowMapSoft = true;
 
-            renderer.shadowCameraNear = 25;
+            renderer.shadowCameraNear = camera.near;
             renderer.shadowCameraFar = camera.far;
             renderer.shadowCameraFov = 50;
 
@@ -275,15 +294,21 @@
             renderer.shadowMapWidth = 1024;
             renderer.shadowMapHeight = 1024;
 
+
             // on effectue le rendu de la scène
             //renderer.render( scene, camera );
         }
-
+        var gt = 0;
         function animate() {
 
             // note: three.js includes requestAnimationFrame shim
             requestAnimationFrame(animate);
-            animator.animate(0.510);
+
+            animator.animate(0.1510);
+            gt += 0.0510;
+
+            camera.position.set((150 + 50*Math.cos(gt/3))*Math.sin(gt), 150 + 100*(1+Math.sin(gt)), (250 + 50*Math.sin(gt/3))*Math.cos(gt));
+            camera.lookAt(new THREE.Vector3(0.0, 50.0, 0.0));
             render();
 
         }
@@ -292,7 +317,7 @@
 
             // mesh.rotation.x += 0.01;
             //mesh.rotation.y += 0.02;
-
+            renderer.setClearColor(0);
             renderer.render(scene, camera);
 
         }
