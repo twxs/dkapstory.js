@@ -17,14 +17,65 @@
     <script type="text/javascript">
          /*global THREE getClass DFK*/
          
+         // this factory hold some 3D Objects
         var factory = new DFK.Factory();
         
         factory.add("mesh::caps", function()
         {
-            return makeCaps();
+            var material = new THREE.MeshLambertMaterial({ color: 0xFC0C20 });
+            var geometry;
+
+            if(!factory.contains("geom::caps"))
+            {
+                geometry = new THREE.CylinderGeometry(6, 6.2, 2);
+                factory.add("geom::caps", geometry);
+            }
+            var caps = new THREE.Mesh(factory.create("geom::caps"), material);
+            caps.castShadow = true;
+            return caps;
         });
         
+        factory.add("mesh::bottle", function()
+        {
+                var baseradius = 10;
+                var topradius = 5;
+                var baseheight = 30;
+                var topheight = 10;
+                var ringheight = 2;
+                var ringradius = 5.5;
+                var base, top, ring;
+    
+    
+                var material = new THREE.MeshLambertMaterial({ color: 0xCCFCC0 });
+                var bottle = new THREE.Object3D();
+                base = new THREE.Mesh(new THREE.CylinderGeometry(baseradius, baseradius, baseheight, 10, 10), material);
+                base.position.y = baseheight / 2;
+                top = new THREE.Mesh(new THREE.CylinderGeometry(topradius, baseradius, topheight, 10, 10), material);
+                top.position.y = baseheight + topheight / 2;
+                ring = new THREE.Mesh(new THREE.CylinderGeometry(ringradius, ringradius, ringheight, 10, 10), material);
+                ring.position.y = baseheight + topheight + ringheight / 2;
+                base.castShadow = true;
+                top.castShadow = true;
+                ring.castShadow = true;
+                base.receiveShadow = true;
+                top.receiveShadow = true;
+                ring.receiveShadow = true;
+    
+                bottle.add(top);
+                bottle.add(base);
+                bottle.add(ring);
+                return bottle;
+        });
+        factory.add("mesh::floor", function(floorRadius){
+                var geometry = new THREE.CylinderGeometry(floorRadius, floorRadius, 0.1, 20, 8);
+                var material = new THREE.MeshPhongMaterial({ color: 0x42AF33 });
+                var mesh =  new THREE.Mesh(geometry, material);
+                mesh.receiveShadow = true;
+                return mesh;
+            });
         
+        
+        // create a simple gravity particule system with capsCount elements centered on pos
         function df_caps_animator(capsCount, pos) {
             var d =  {};
             d.obj = new THREE.Object3D();
@@ -34,7 +85,7 @@
             for (var i = 0; i < capsCount; ++i) {
                 
                 d.obj.add(factory.create("mesh::caps")());
-
+                // create the physics engine for each particule
                 var part = new DFK.particule(
                     0.32, 
                     DFK.P, 
@@ -78,90 +129,10 @@
             return d;
         }
 
-        
-
-
-        var renderer, scene, camera, bottle, caps, mycaps, animator;
-
-        init();
-        document.addEventListener('mousemove', onDocumentMouseMove, false);
-        animate();
-
-
-        function makeBottle() {
-            var baseradius = 10;
-            var topradius = 5;
-            var baseheight = 30;
-            var topheight = 10;
-            var ringheight = 2;
-            var ringradius = 5.5;
-
-            var base, top, ring;
-
-
-            var material = new THREE.MeshLambertMaterial({ color: 0xCCFCC0 });
-
-
-            var bottle = new THREE.Object3D();
-
-
-            base = new THREE.Mesh(new THREE.CylinderGeometry(baseradius, baseradius, baseheight, 10, 10), material);
-            base.position.y = baseheight / 2;
-
-            top = new THREE.Mesh(new THREE.CylinderGeometry(topradius, baseradius, topheight, 10, 10), material);
-            top.position.y = baseheight + topheight / 2;
-
-            ring = new THREE.Mesh(new THREE.CylinderGeometry(ringradius, ringradius, ringheight, 10, 10), material);
-            ring.position.y = baseheight + topheight + ringheight / 2;
-
-
-            base.castShadow = true;
-            top.castShadow = true;
-            ring.castShadow = true;
-
-            base.receiveShadow = true;
-            top.receiveShadow = true;
-            ring.receiveShadow = true;
-
-            bottle.add(top)
-            bottle.add(base)
-            bottle.add(ring)
-            return bottle;
-        }
-
-        function makeCaps() {
-            var material = new THREE.MeshLambertMaterial({ color: 0xFC0C20 });
-            var geometry;
-
-            if(!factory.contains("geom::caps"))
-            {
-                geometry = new THREE.CylinderGeometry(6, 6.2, 2);
-                factory.add("geom::caps", geometry);
-            }
-            var ring = new THREE.Mesh(factory.create("geom::caps"), material);
-            return ring;
-        }
-
-        function onDocumentMouseMove(event) {
-
-            event.preventDefault();
-
-            var movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
-            var movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
-
-            mycaps.position.x += movementX * 0.1;
-            mycaps.position.y += movementY * 0.1;
-
-            render();
-
-        }
-
+        // create a light and mak sure the the floor kept in the fustrum
         function df_dlight(lightPos, lightTarget, floorRadius) {
+            var dist = DFK.v3dist(lightPos, lightTarget);
            
-
-            var lightDir = DFK.v3(lightTarget.x - lightPos.x, lightTarget.y - lightPos.y, lightTarget.z - lightPos.z);
-            var dist = Math.sqrt(lightDir.x * lightDir.x + lightDir.y * lightDir.y + lightDir.z * lightDir.z);
-            document.title = lightDir.x;
             var light = new THREE.DirectionalLight(0x444444);
 
             light.position.set(lightPos.x, lightPos.y, lightPos.z);
@@ -169,8 +140,6 @@
 
             light.castShadow = true;
             light.shadowDarkness = 0.5;
-            //light.shadowCameraVisible = true; // only for debugging
-            // these six values define the boundaries of the yellow box seen above
             light.shadowCameraNear = dist - floorRadius;
             light.shadowCameraFar = dist + floorRadius;
             light.shadowCameraLeft = -floorRadius;
@@ -182,53 +151,50 @@
         }
 
 
+        var renderer, scene, camera, animator;
+
+        init();
+        
+        animate();
+
+        
+
+
         function init() {
+            var width = 512;
+            var height = 512;
             // on initialise le moteur de rendu
             renderer = new THREE.WebGLRenderer();
 
             // si WebGL ne fonctionne pas sur votre navigateur vous pouvez utiliser le moteur de rendu Canvas à la place
-            // renderer = new THREE.CanvasRenderer();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            //renderer = new THREE.CanvasRenderer();
+            renderer.setSize(width, height);//window.innerWidth, window.innerHeight);
             document.getElementById('container').appendChild(renderer.domElement);
 
             // on initialise la scène
             scene = new THREE.Scene();
 
-            // on initialise la camera que l’on place ensuite sur la scène
-            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 1000);
+            // setting up the camera
+            camera = new THREE.PerspectiveCamera(50, width / height, 1, 1000);
             camera.position.set(0, 150, 250);
-            // camera.rotation.x = -0.25;
             camera.lookAt(new THREE.Vector3(0.0, 50.0, 0.0));
             scene.add(camera);
-
-            bottle = makeBottle();
-            caps = makeCaps();
-            mycaps = makeCaps();
-            caps.position.y = 42;
-            mycaps.position.y = 50;
-            mycaps.position.z = 20;
-            mycaps.position.x = 7;
-            scene.add(bottle);
-            scene.add(caps);
-            scene.add(mycaps);
-
-            var capsule = factory.create("mesh::caps")();
-            capsule.position.set(20, 20, 20);
             
-
-
-            animator = new df_caps_animator(200, new THREE.Vector3(0, 48, 0));
+            // add a bottle first
+            scene.add(factory.create("mesh::bottle")());
+         
+            // then create 500 animated caps on top of the bottle
+            animator = new df_caps_animator(500, new THREE.Vector3(0, 48, 0));
+            // and add them to the scene
             scene.add(animator.obj);
 
+            // Finally add a floor to don't lost the others 3D objects in the space
             var floorRadius = 200;
-            /* Floor  */
-            var geometry = new THREE.CylinderGeometry(floorRadius, floorRadius, 0.1, 20, 8);
-            var material = new THREE.MeshPhongMaterial({ color: 0x42AF33 });
-            var floor = new THREE.Mesh(geometry, material);
-            floor.material.side = THREE.DoubleSide;
-            //floor.rotation.x = 3.1415 / 2;
-            scene.add(floor);
+            scene.add(factory.create("mesh::floor")(200));
 
+
+            
+            // adding 4 lights around the bottle
             var lightPos = DFK.v3(floorRadius + 50, 2*floorRadius, 0.5*floorRadius + 50);
           
             scene.add(df_dlight(lightPos, DFK.v3(0, 30, 0), floorRadius));
@@ -239,17 +205,8 @@
             lightPos.x *= -1;
             scene.add(df_dlight(lightPos, DFK.v3(0, 30, 0), floorRadius));
 
-            bottle.receiveShadow = true;
-            caps.castShadow = true;
-            caps.receiveShadow = true;
-            mycaps.receiveShadow = true;
-            mycaps.castShadow = true;
 
-            floor.receiveShadow = true;
-            // add to the scene
-
-
-
+            // Enabling the shadow
             renderer.shadowMapEnabled = true;
             renderer.shadowMapSoft = true;
 
@@ -266,14 +223,14 @@
             // on effectue le rendu de la scène
             //renderer.render( scene, camera );
         }
-        var gt = 0;
+        var gt = 0; // a global timer
         function animate() {
-
-            // note: three.js includes requestAnimationFrame shim
+            
             requestAnimationFrame(animate);
 
+            // updating the caps
             animator.animate(0.10510);
-            gt += 0.02510;
+            gt += 0.01;//0.02510;
 
             camera.position.set((150 + 50*Math.cos(gt/3))*Math.sin(gt), 150 + 100*(1+Math.sin(gt)), (250 + 50*Math.sin(gt/3))*Math.cos(gt));
             camera.lookAt(new THREE.Vector3(0.0, 50.0, 0.0));
@@ -282,9 +239,6 @@
         }
 
         function render() {
-
-            // mesh.rotation.x += 0.01;
-            //mesh.rotation.y += 0.02;
             renderer.setClearColor(0);
             renderer.render(scene, camera);
 
