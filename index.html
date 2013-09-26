@@ -15,92 +15,70 @@
 
 
     <script type="text/javascript">
-        
+         /*global THREE getClass DFK*/
+         
         var factory = new DFK.Factory();
         
-        
-        
-        function df_particule(vit, pos) {
-            var d = {};
-            d.m = 0.32;
-            d.p0 = pos.clone();
-            d.v0 = vit.clone();
-
-            var part = new DFK.particule(d.m, DFK.P);
-            
-            part.onDie = function (p, v)
-            {
-                if (v.y < 0.1) // Full reset
-                    part.reset(d.p0, d.v0);
-                else // bounce
-                    part.reset(p, DFK.v3(2*v.x, 0.5*v.y, 2*v.z));
-            }
-            part.shouldDie = function(p, v) {
-                return p.y < 0;
-            }
-            
-            d.animate = function (dt) {
-                d.p = part.next(dt);
-            }
-            return d;
-        }
+        factory.add("mesh::caps", function()
+        {
+            return makeCaps();
+        });
         
         
         function df_caps_animator(capsCount, pos) {
             var d =  {};
             d.obj = new THREE.Object3D();
-
-            d.caps = [];
+            
             d.particules = [];
 
             for (var i = 0; i < capsCount; ++i) {
-                d.caps.push(new df_caps());
-                d.obj.add(d.caps[i].mesh);
-
-                var part = new DFK.particule(0.32, DFK.P);
                 
-                part.onDie = function (part)
-                {
-                    var min = 5;
-                    if (part.v.y < min) // Full reset
-                        part.reset(new THREE.Vector3(pos.x + DFK.rnd(-1, 1), pos.y + DFK.rnd(0, 1), pos.z),
-                                   new THREE.Vector3(Math.sin(DFK.rnd(-3.1415, 3.1415)), 4 + DFK.rnd(-1, 1.5), Math.cos(DFK.rnd(-3.1415, 3.1415))));
-                    else // bounce
-                    {
-                        part.p.y = min;
-                        part.reset(part.p, DFK.v3(2*part.v.x, 0.7*part.v.y, 2*part.v.z));
-                    }
-                }
-                part.shouldDie = function(p, v) {
-                    return p.y < 0;
-                }
+                d.obj.add(factory.create("mesh::caps")());
 
-               
+                var part = new DFK.particule(
+                    0.32, 
+                    DFK.P, 
+                    {
+                        onDie : function (part) {
+                                    var min = 5;
+                                    if (part.v.y < min) // Full reset
+                                        part.reset(DFK.v3(pos.x + DFK.rnd(-1, 1), 
+                                                          pos.y + DFK.rnd(0, 1), 
+                                                          pos.z),
+                                                   DFK.v3(Math.sin(DFK.rnd(-3.1415, 3.1415)), 
+                                                          4 + DFK.rnd(-1, 1.5), 
+                                                          Math.cos(DFK.rnd(-3.1415, 3.1415))));
+                                    else // bounce
+                                    {
+                                        part.p.y = min;
+                                        part.reset(part.p, DFK.v3(2*part.v.x, 
+                                                                  0.7*part.v.y, 
+                                                                  2*part.v.z));
+                                    }
+                                },
+                        shouldDie : function(p, v) { return p.y < 0; }
+                    });
+
+
                 d.particules.push(part);
             }
 
             d.animate = function (dt) {
-                for (var i = 0; i < d.caps.length; ++i) {
+                for (var i = 0; i < d.particules.length; ++i) {
+                    // get the new particule position
                     var new_pos = d.particules[i].next(dt);
-                    d.caps[i].move_to(new_pos.x, new_pos.y, new_pos.z);
-                    d.caps[i].mesh.rotation.x = new_pos.z / 10;
-                    d.caps[i].mesh.rotation.z = new_pos.y / 10;
+                    
+                    var mesh = d.obj.children[i];
+                    //update the mesh position and little hack on the rotation
+                    mesh.position.set(new_pos.x, new_pos.y, new_pos.z);
+                    mesh.rotation.x = new_pos.z / 10;
+                    mesh.rotation.z = new_pos.y / 10;
                 }
             }
             return d;
         }
 
-        function df_caps() {
-            this.mesh = makeCaps();
-            this.mesh.castShadow = true;
-
-            this.move_to = function (x, y, z) {
-                this.mesh.position.x = x;
-                this.mesh.position.y = y;
-                this.mesh.position.z = z;
-            }
-        }
-
+        
 
 
         var renderer, scene, camera, bottle, caps, mycaps, animator;
@@ -171,8 +149,6 @@
             var movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
             var movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
 
-            //camera.rotation.x += movementY*0.001;
-            //camera.rotation.y += movementX*0.001;
             mycaps.position.x += movementX * 0.1;
             mycaps.position.y += movementY * 0.1;
 
@@ -181,7 +157,6 @@
         }
 
         function df_dlight(lightPos, lightTarget, floorRadius) {
-
            
 
             var lightDir = DFK.v3(lightTarget.x - lightPos.x, lightTarget.y - lightPos.y, lightTarget.z - lightPos.z);
@@ -237,11 +212,9 @@
             scene.add(caps);
             scene.add(mycaps);
 
-            var capsule = new df_caps();
-            capsule.mesh.position.x = 20;
-            capsule.mesh.position.y = 20;
-            capsule.mesh.position.z = 20;
-            //scene.add(capsule.mesh);
+            var capsule = factory.create("mesh::caps")();
+            capsule.position.set(20, 20, 20);
+            
 
 
             animator = new df_caps_animator(200, new THREE.Vector3(0, 48, 0));

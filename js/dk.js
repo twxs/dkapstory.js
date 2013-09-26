@@ -100,14 +100,22 @@ var DFK= (function()
     
     // Particules Section
     
-    df.particule = function(m, F) {
+    df.particule = function(m, F, opts) {
         var d = {};
         d.is_dead = true;
         d.p = df.v3(0,0,0);
         d.v = df.v3(0,0,0);
         d.m = m;
-        d.F = F;
+        d.F = F.clone();
         
+        if (opts && opts['onDie'])
+        {
+            d.onDie = opts['onDie'];
+        }
+        if (opts && opts['onDie'])
+        {
+            d.shouldDie = opts['shouldDie'];
+        }
         d.reset = function(p0, v0) {
             d.v.copy(v0);
             d.p.copy(p0);
@@ -115,7 +123,6 @@ var DFK= (function()
             d.is_dead = false;
         }
         d.next = function(dt) {
-            console.log(d.is_dead);
             if(d.is_dead)
             {
                 d.onDie(d);
